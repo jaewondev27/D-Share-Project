@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>StreamShare | Client</title>
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <style>
+        :root { --bg: #ffffff; --text: #111827; --sub: #6b7280; --accent: #4f46e5; --shadow: rgba(79, 70, 229, 0.15); }
+        body, html { margin: 0; padding: 0; width: 100%; height: 100%; background: var(--bg); font-family: 'Pretendard', sans-serif; display: flex; flex-direction: column; overflow: hidden; }
+        .header-credit { position: absolute; top: 24px; left: 24px; font-size: 14px; font-weight: 500; color: var(--sub); z-index: 10; }
+        
+        .main-container { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; transition: opacity 0.5s ease, transform 0.5s ease; }
+        .device-name { font-size: 48px; font-weight: 800; color: var(--text); margin-bottom: 8px; }
+        .ip-address { font-size: 18px; color: var(--sub); margin-bottom: 48px; }
+        
+        .code-box { border: 1px solid #f3f4f6; padding: 24px 64px; border-radius: 24px; box-shadow: 0 10px 40px var(--shadow); background: white; margin-bottom: 40px; animation: fadeInUp 0.6s ease; }
+        .code-text { font-size: 64px; font-weight: 900; letter-spacing: 6px; color: var(--accent); }
+        .instruction { font-size: 18px; line-height: 1.6; color: var(--sub); font-weight: 500; }
+        
+        /* 비디오 컨트롤 제거 */
+        video { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: black; display: none; object-fit: contain; z-index: 100; pointer-events: none; }
+        
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #ffffff; display: flex; align-items: center; justify-content: center; z-index: 1000; animation: fadeIn 0.3s ease; }
+        .modal-content { text-align: center; width: 100%; max-width: 400px; padding: 40px; display: flex; flex-direction: column; align-items: center; animation: scaleUp 0.4s ease; }
+        input { width: 100%; padding: 18px; font-size: 18px; border: 2px solid #e5e7eb; border-radius: 15px; text-align: center; margin-bottom: 20px; outline: none; background: #f9fafb; box-sizing: border-box; transition: border-color 0.2s; }
+        input:focus { border-color: var(--accent); }
+        .btn-black { width: 100%; padding: 18px; background: #000; color: #fff; border: none; border-radius: 15px; font-size: 18px; font-weight: 600; cursor: pointer; transition: transform 0.1s; }
+        .btn-black:active { transform: scale(0.98); }
+        .btn-sub { width: 100%; padding: 18px; background: #f3f4f6; color: #374151; border: none; border-radius: 15px; font-size: 16px; font-weight: 600; cursor: pointer; margin-top: 10px; }
+        
+        #status-msg { position: fixed; top: 30px; left: 50%; transform: translateX(-50%); background: #1f2937; color: #fff; padding: 12px 28px; border-radius: 50px; font-size: 15px; z-index: 2000; display: none; box-shadow: 0 4px 12px rgba(0,0,0,0.2); animation: slideDown 0.4s ease; }
+
+        .settings-container { position: fixed; bottom: 24px; right: 24px; z-index: 1100; }
+        .settings-btn { padding: 10px 20px; background: #f3f4f6; border-radius: 12px; display: flex; align-items: center; justify-content: center; cursor: pointer; border: none; font-size: 14px; font-weight: 600; box-shadow: 0 4px 6px rgba(0,0,0,0.05); color: #374151; transition: background 0.2s; }
+        .settings-btn:hover { background: #e5e7eb; }
+        .settings-menu { position: absolute; bottom: 60px; right: 0; background: white; border-radius: 16px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); border: 1px solid #e5e7eb; display: none; width: 180px; overflow: hidden; animation: fadeInUp 0.3s ease; }
+        .settings-menu button { width: 100%; padding: 14px 20px; border: none; background: none; text-align: left; cursor: pointer; font-size: 14px; font-weight: 500; color: #374151; }
+        .settings-menu button:hover { background: #f9fafb; }
+        .settings-menu button.danger { color: #ef4444; }
+
+        #user-profile-container { position: fixed; right: 24px; top: 45%; transform: translateY(-50%); z-index: 1200; display: none; animation: fadeInRight 0.5s ease; }
+        #user-btn { width: 42px; height: 42px; border-radius: 12px; border: 2px solid white; cursor: pointer; overflow: hidden; box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
+        #user-btn img { width: 100%; height: 100%; object-fit: cover; }
+        #user-menu { position: absolute; right: 55px; top: 0; background: white; border-radius: 16px; padding: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); display: none; width: 150px; text-align: center; animation: fadeIn 0.2s ease; }
+        #user-menu p { margin: 0 0 10px 0; font-weight: bold; font-size: 14px; color: #333; }
+
+        /* 애니메이션 정의 */
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes fadeInUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes fadeInRight { from { opacity: 0; transform: translate(20px, -50%); } to { opacity: 1; transform: translate(0, -50%); } }
+        @keyframes scaleUp { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: scale(1); } }
+        @keyframes slideDown { from { opacity: 0; transform: translate(-50%, -20px); } to { opacity: 1; transform: translate(-50%, 0); } }
+    </style>
+</head>
+<body onclick="autoFullscreen()">
+    <div class="header-credit">Made by Shin Jaewon</div>
+    <div id="status-msg">알림 메시지</div>
+
+    <div id="name-modal" class="modal-overlay">
+        <div class="modal-content">
+            <h2 style="font-size: 28px; margin-bottom: 12px;">기기 이름 설정</h2>
+            <p style="color: var(--sub); margin-bottom: 32px;">이 화면을 식별할 이름을 입력하세요.</p>
+            <input type="text" id="client-name-input" placeholder="예: 회의실 TV">
+            <button class="btn-black" onclick="saveClientName()">설정 완료</button>
+            <button id="name-cancel-btn" class="btn-sub" onclick="cancelNameChange()" style="display: none;">취소</button>
+        </div>
+    </div>
+
+    <div class="settings-container" id="settings-area">
+        <button class="settings-btn" onclick="toggleSettings(event)">설정</button>
+        <div class="settings-menu" id="settings-menu">
+            <button onclick="changeName()">이름 바꾸기</button>
+            <button class="danger" onclick="resetAll()">전체 초기화</button>
+        </div>
+    </div>
+
+    <div id="user-profile-container">
+        <div id="user-btn" onclick="toggleUserMenu(event)">
+            <img src="https://img.icons8.com/fluent-systems-filled/1200/user.jpg" alt="user">
+        </div>
+        <div id="user-menu">
+            <p id="connected-user-name">사용자</p>
+            <button class="btn-black" style="padding: 8px; font-size: 12px; background: #ef4444;" onclick="forceDisconnect()">연결해제</button>
+        </div>
+    </div>
+
+    <div class="main-container" id="main-ui">
+        <div class="device-info">
+            <div class="device-name" id="client-name-display">기기이름</div>
+            <div class="ip-address">연결 대기 중</div>
+        </div>
+        <div class="code-box">
+            <div class="code-text" id="display-code">------</div>
+        </div>
+        <div class="instruction">연결할 준비가 되었습니다. 연결코드를 기기에<br>입력해 화면을 공유하세요</div>
+    </div>
+
+    <video id="remoteVideo" autoplay playsinline></video>
+
+    <script>
+        let peer, currentCall, dataConn;
+        const video = document.getElementById('remoteVideo');
+        const mainUi = document.getElementById('main-ui');
+
+        function autoFullscreen() {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen().catch(e => {});
+            }
+        }
+
+        window.onload = () => {
+            const savedName = localStorage.getItem('sw-client-name');
+            if(savedName) {
+                document.getElementById('client-name-display').innerText = savedName;
+                document.getElementById('name-modal').style.display = 'none';
+                initPeer();
+            }
+        };
+
+        function saveClientName() {
+            const name = document.getElementById('client-name-input').value.trim();
+            if(!name) return alert("이름을 입력하세요.");
+            localStorage.setItem('sw-client-name', name);
+            document.getElementById('client-name-display').innerText = name;
+            document.getElementById('name-modal').style.display = 'none';
+            if(!peer) initPeer();
+        }
+
+        function cancelNameChange() {
+            document.getElementById('name-modal').style.display = 'none';
+        }
+
+        function toggleSettings(e) {
+            e.stopPropagation();
+            const menu = document.getElementById('settings-menu');
+            menu.style.display = menu.style.display === 'block' ? 'none' : 'block';
+        }
+
+        function toggleUserMenu(e) {
+            e.stopPropagation();
+            const menu = document.getElementById('user-menu');
+            menu.style.display = menu.style.display === 'block' ? 'none' : 'block';
+        }
+
+        function forceDisconnect() {
+            if(dataConn) dataConn.send('DISCONNECT_REQUEST');
+            if(currentCall) currentCall.close();
+            resetUI();
+        }
+
+        function changeName() {
+            document.getElementById('name-cancel-btn').style.display = 'block';
+            document.getElementById('name-modal').style.display = 'flex';
+        }
+
+        function resetAll() {
+            if(confirm("모든 설정이 초기화됩니다. 계속하시겠습니까?")) {
+                localStorage.clear();
+                location.reload();
+            }
+        }
+
+        function initPeer() {
+            const code = Math.random().toString(36).substring(2, 8).toUpperCase();
+            document.getElementById('display-code').innerText = code;
+            
+            if(peer) peer.destroy();
+            peer = new Peer(code);
+
+            peer.on('connection', (conn) => {
+                dataConn = conn;
+                dataConn.on('data', (data) => {
+                    if(data === 'APP_DISCONNECT') resetUI();
+                });
+            });
+
+            peer.on('call', (call) => {
+                currentCall = call;
+                const senderName = call.metadata?.name || "알 수 없는 사용자";
+                document.getElementById('connected-user-name').innerText = senderName;
+                call.answer();
+                
+                call.on('stream', (stream) => {
+                    video.srcObject = stream;
+                    video.style.display = 'block';
+                    mainUi.style.opacity = '0';
+                    document.getElementById('settings-area').style.display = 'none';
+                    document.getElementById('user-profile-container').style.display = 'block';
+                    showStatusMsg(`✅ ${senderName}님이 연결되었습니다.`);
+                });
+
+                call.on('close', resetUI);
+            });
+        }
+
+        function resetUI() {
+            video.style.display = 'none';
+            video.srcObject = null;
+            mainUi.style.opacity = '1';
+            document.getElementById('settings-area').style.display = 'block';
+            document.getElementById('user-profile-container').style.display = 'none';
+            document.getElementById('user-menu').style.display = 'none';
+            showStatusMsg("🔴 연결이 종료되었습니다.");
+            initPeer();
+        }
+
+        function showStatusMsg(text) {
+            const msg = document.getElementById('status-msg');
+            msg.innerText = text;
+            msg.style.display = 'block';
+            setTimeout(() => { msg.style.display = 'none'; }, 4000);
+        }
+
+        window.onclick = function(event) {
+            document.getElementById('settings-menu').style.display = 'none';
+            document.getElementById('user-menu').style.display = 'none';
+        }
+    </script>
+</body>
+</html>
