@@ -151,7 +151,6 @@
         }
 
         async function startStream() {
-            // [중요 수정] Peer 객체의 존재 여부와 오픈 상태를 먼저 확인합니다.
             if (!peer || !peer.open) {
                 return alert("PeerJS 서버와 연결 중입니다. 약 1~2초 후 다시 클릭해주세요.");
             }
@@ -163,7 +162,14 @@
             connModal.style.display = 'flex';
 
             try {
-                currentStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
+                // 1. PC 환경을 위해 오디오 포함 화면 공유 시도
+                try {
+                    currentStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
+                } catch (audioErr) {
+                    // 2. 모바일 브라우저 등에서 실패 시 비디오 단독 공유로 전환 (폴백)
+                    console.log("오디오 포함 화면 공유 실패, 비디오 단독 공유로 전환합니다.", audioErr);
+                    currentStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+                }
                 
                 dataConn = peer.connect(code);
                 dataConn.on('open', () => {
@@ -184,7 +190,7 @@
                 call.on('close', stopStream);
             } catch (err) {
                 connModal.style.display = 'none';
-                alert("권한 거부 또는 연결 실패: " + err.message);
+                alert("화면 공유 권한이 거부되었거나 지원하지 않는 브라우저입니다. (" + err.message + ")");
             }
         }
 
