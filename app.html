@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>DShare - 화면 공유</title>
-    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
         :root { --bg: #ffffff; --text: #111827; --sub: #6b7280; --accent: #4f46e5; --input-bg: #f9fafb; }
         body, html { margin: 0; padding: 0; width: 100%; height: 100%; background: var(--bg); font-family: -apple-system, BlinkMacSystemFont, 'Pretendard', sans-serif; display: flex; flex-direction: column; overflow: hidden; }
@@ -30,9 +29,11 @@
         .settings-menu button.danger { color: #ef4444; }
         #sharing-ui { display: none; }
         #status-message { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.8); color: white; padding: 20px 40px; border-radius: 12px; font-size: 16px; z-index: 2000; display: none; }
-        #my-peer-id { font-size: 24px; font-weight: 700; color: var(--accent); background: #f0f0ff; padding: 10px 20px; border-radius: 10px; margin: 20px 0; letter-spacing: 2px; }
+        #my-peer-id { font-size: 20px; font-weight: 700; color: var(--accent); background: #f0f0ff; padding: 10px 20px; border-radius: 10px; margin: 20px 0; letter-spacing: 2px; }
         #screen-preview { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000; display: none; z-index: 500; }
         #screen-preview video { width: 100%; height: 100%; object-fit: contain; }
+        .server-info { position: fixed; bottom: 24px; left: 24px; background: white; border-radius: 12px; padding: 15px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); font-size: 13px; }
+        .server-info strong { color: var(--accent); }
     </style>
 </head>
 <body>
@@ -63,19 +64,19 @@
     <div class="main-container" id="input-ui">
         <div class="device-name" id="my-name-display">사용자 이름</div>
         <div id="my-peer-id">내 ID: ------</div>
-        <div class="instruction">아래에 PIN 코드를 입력하여 화면을 공유하세요.</div>
+        <div class="instruction">아래에 6 자리 숫자를 입력하여 화면을 공유하세요.</div>
         <div class="form-area">
             <input type="number" id="target-code" placeholder="6 자리 숫자" maxlength="6" style="text-align: center; font-weight: bold; letter-spacing: 5px; font-size: 24px;">
             <button class="connect-btn" onclick="startStream()">화면 공유 시작</button>
         </div>
-        <p style="color: var(--sub); font-size: 14px; margin-top: 20px;">
-            casts.app 에서 이 ID 로 연결하거나, 아래 코드를 입력하세요
-        </p>
+        <div class="server-info">
+            <div>📡 내 ID: <strong id="my-id-display">------</strong></div>
+            <div style="margin-top: 5px; color: var(--sub);">casts.app 에서 이 ID 로 연결하세요</div>
+        </div>
     </div>
     <div class="main-container" id="sharing-ui">
         <div class="device-name" id="target-device-display">상대 기기</div>
         <div class="instruction">에 화면 공유 중...</div>
-        <div id="my-peer-id-display" style="font-size: 18px; color: var(--sub); margin: 20px 0;"></div>
         <div class="form-area">
             <button class="connect-btn" style="background: #ef4444;" onclick="stopStream()">연결해제</button>
         </div>
@@ -94,6 +95,7 @@
             // 6 자리 숫자 ID 생성
             myPeerId = generatePeerId();
             document.getElementById('my-peer-id').innerText = `내 ID: ${myPeerId}`;
+            document.getElementById('my-id-display').innerText = myPeerId;
             
             peer = new Peer(myPeerId, {
                 host: '0.peerjs.com',
@@ -105,7 +107,6 @@
 
             peer.on('open', (id) => {
                 console.log('My peer ID:', id);
-                showStatusMsg('PeerJS 연결됨');
             });
 
             peer.on('connection', (connection) => {
@@ -117,7 +118,6 @@
             peer.on('error', (err) => {
                 console.error('PeerJS error:', err);
                 if (err.type === 'unavailable-id') {
-                    // ID 중복 시 재생성
                     setTimeout(() => initPeer(), 1000);
                 } else {
                     showStatusMsg('연결 오류: ' + err.type);
@@ -185,7 +185,6 @@
                     }
 
                     document.getElementById('target-device-display').innerText = code;
-                    document.getElementById('my-peer-id-display').innerText = `내 ID: ${myPeerId}`;
                     document.getElementById('input-ui').style.display = 'none';
                     document.getElementById('sharing-ui').style.display = 'flex';
                     document.getElementById('connecting-modal').style.display = 'none';
